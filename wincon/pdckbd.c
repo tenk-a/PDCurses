@@ -21,6 +21,8 @@ static int save_press = 0;
  *    These values are for strict IBM keyboard compatibles only         *
  ************************************************************************/
 
+#define MAX_KPTAB 256
+
 typedef struct
 {
     unsigned short normal;
@@ -30,7 +32,7 @@ typedef struct
     unsigned short extended;
 } KPTAB;
 
-static KPTAB kptab[] =
+static const KPTAB kptab[MAX_KPTAB] =
 {
    {0,          0,         0,           0,          0   }, /* 0  */
    {0,          0,         0,           0,          0   }, /* 1   VK_LBUTTON */
@@ -157,7 +159,7 @@ static KPTAB kptab[] =
    {KEY_F(11),  KEY_F(23), KEY_F(35),   KEY_F(47),  0   }, /* 122 VK_F11     */
    {KEY_F(12),  KEY_F(24), KEY_F(36),   KEY_F(48),  0   }, /* 123 VK_F12     */
 
-   /* 124 through 218 */
+   /* 124 through 185 */
 
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
@@ -174,24 +176,32 @@ static KPTAB kptab[] =
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
-   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
 
-   {0x5B,       0x7B,      0x1B,        ALT_LBRACKET,0  }, /* 219 */
-   {0x5C,       0x7C,      0x1C,        ALT_BSLASH, 0   }, /* 220 */
-   {0x5D,       0x7D,      0x1D,        ALT_RBRACKET,0  }, /* 221 */
-   {0,          0,         0x27,        ALT_FQUOTE, 0   }, /* 222 */
+   /* 193 through 218 */
+
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+   {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+
+   {0x5B,       0x7B,      0x1B,        ALT_LBRACKET,0  }, /* 219 VK_OEM_4 */
+   {0x5C,       0x7C,      0x1C,        ALT_BSLASH, 0   }, /* 220 VK_OEM_5 */
+   {0x5D,       0x7D,      0x1D,        ALT_RBRACKET,0  }, /* 221 VK_OEM_6 */
+   {0,          0,         0x27,        ALT_FQUOTE, 0   }, /* 222 VK_OEM_7 */
    {0,          0,         0,           0,          0   }, /* 223 */
    {0,          0,         0,           0,          0   }, /* 224 */
    {0,          0,         0,           0,          0   }, /* 225 */
    {0,          0,         0,           0,          0   }, /* 226 */
+
+   /* 227 through 255 */
+
    {0,          0,         0,           0,          0   }, /* 227 */
    {0,          0,         0,           0,          0   }, /* 228 */
    {0,          0,         0,           0,          0   }, /* 229 */
@@ -223,22 +233,22 @@ static KPTAB kptab[] =
    {0,          0,         0,           0,          0   }  /* 255 */
 };
 
-static KPTAB ext_kptab[] =
+static const KPTAB ext_kptab[] =
 {
-   {0,          0,              0,              0,          }, /* MUST BE EMPTY */
-   {PADENTER,   SHF_PADENTER,   CTL_PADENTER,   ALT_PADENTER}, /* 13 */
-   {PADSLASH,   SHF_PADSLASH,   CTL_PADSLASH,   ALT_PADSLASH}, /* 111 */
-   {KEY_PPAGE,  KEY_SPREVIOUS,  CTL_PGUP,       ALT_PGUP    }, /* 33 */
-   {KEY_NPAGE,  KEY_SNEXT,      CTL_PGDN,       ALT_PGDN    }, /* 34 */
-   {KEY_END,    KEY_SEND,       CTL_END,        ALT_END     }, /* 35 */
-   {KEY_HOME,   KEY_SHOME,      CTL_HOME,       ALT_HOME    }, /* 36 */
-   {KEY_LEFT,   KEY_SLEFT,      CTL_LEFT,       ALT_LEFT    }, /* 37 */
-   {KEY_UP,     KEY_SUP,        CTL_UP,         ALT_UP      }, /* 38 */
-   {KEY_RIGHT,  KEY_SRIGHT,     CTL_RIGHT,      ALT_RIGHT   }, /* 39 */
-   {KEY_DOWN,   KEY_SDOWN,      CTL_DOWN,       ALT_DOWN    }, /* 40 */
-   {KEY_IC,     KEY_SIC,        CTL_INS,        ALT_INS     }, /* 45 */
-   {KEY_DC,     KEY_SDC,        CTL_DEL,        ALT_DEL     }, /* 46 */
-   {PADSLASH,   SHF_PADSLASH,   CTL_PADSLASH,   ALT_PADSLASH}, /* 191 */
+   {0,          0,              0,              0,            0}, /* MUST BE EMPTY */
+   {PADENTER,   SHF_PADENTER,   CTL_PADENTER,   ALT_PADENTER, 0}, /* 13 */
+   {PADSLASH,   SHF_PADSLASH,   CTL_PADSLASH,   ALT_PADSLASH, 0}, /* 111 */
+   {KEY_PPAGE,  KEY_SPREVIOUS,  CTL_PGUP,       ALT_PGUP,     0}, /* 33 */
+   {KEY_NPAGE,  KEY_SNEXT,      CTL_PGDN,       ALT_PGDN,     0}, /* 34 */
+   {KEY_END,    KEY_SEND,       CTL_END,        ALT_END,      0}, /* 35 */
+   {KEY_HOME,   KEY_SHOME,      CTL_HOME,       ALT_HOME,     0}, /* 36 */
+   {KEY_LEFT,   KEY_SLEFT,      CTL_LEFT,       ALT_LEFT,     0}, /* 37 */
+   {KEY_UP,     KEY_SUP,        CTL_UP,         ALT_UP,       0}, /* 38 */
+   {KEY_RIGHT,  KEY_SRIGHT,     CTL_RIGHT,      ALT_RIGHT,    0}, /* 39 */
+   {KEY_DOWN,   KEY_SDOWN,      CTL_DOWN,       ALT_DOWN,     0}, /* 40 */
+   {KEY_IC,     KEY_SIC,        CTL_INS,        ALT_INS,      0}, /* 45 */
+   {KEY_DC,     KEY_SDC,        CTL_DEL,        ALT_DEL,      0}, /* 46 */
+   {PADSLASH,   SHF_PADSLASH,   CTL_PADSLASH,   ALT_PADSLASH, 0}, /* 191 */
 };
 
 /* End of kptab[] */
