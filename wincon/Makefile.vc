@@ -31,6 +31,18 @@ CFLAGS		= -O1
 LDFLAGS		=
 !endif
 
+!ifdef WIN10_JP
+CFLAGS  = $(CFLAGS)                                               \
+          -DPDC_WIN10_JP  -DPDC_WIDE  -DPDC_FORCE_UTF8            \
+          -DPDC_FORCE_UPDATE          -DPDC_SKIP_ZERO_WIDTH_SPACE \
+          -DPDC_NO_CHECK_ON_RESIZE    -DPDC_CLEAR_ON_RESIZE       \
+          -DPDC_CURSOR_HOME_ON_RESIZE -DPDC_ADDITIONAL_KEYS       \
+          -DPDC_VT_MOUSE_INPUT        -DPDC_DISABLE_CLICK_EVENT   \
+          -DPDC_PASTE_ON_RIGHT_CLICK
+PDCOBJS = $(PDCOBJS) pdcdisp_sub.$(O) pdckbd_sub.$(O)
+WINDRES_FLAGS = $(WINDRES_FLAGS) -DPDC_WIN10_JP
+!endif
+
 !ifdef WIDE
 WIDEOPT		= -DPDC_WIDE
 !endif
@@ -95,7 +107,7 @@ $(CURSESDLL) : $(LIBOBJS) $(PDCOBJS) pdcurses.obj
 	$(SHL_LD) $(LIBOBJS) $(PDCOBJS) pdcurses.obj $(CCLIBS)
 
 pdcurses.res pdcurses.obj: $(common)\pdcurses.rc
-	rc -r -fopdcurses.res $(common)\pdcurses.rc
+	rc -r -fopdcurses.res $(WINDRES_FLAGS) $(common)\pdcurses.rc
 	cvtres -machine:$(PLATFORM) -nologo -out:pdcurses.obj pdcurses.res
 
 {$(srcdir)\}.c{}.obj::

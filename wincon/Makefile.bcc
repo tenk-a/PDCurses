@@ -38,8 +38,19 @@ UTF8OPT		= -DPDC_FORCE_UTF8
 INFOPT          = -DHAVE_NO_INFOEX
 !endif
 
+!ifdef WIN10_JP
+WIN10_JP_OPT  = \
+          -DPDC_WIN10_JP  -DPDC_WIDE  -DPDC_FORCE_UTF8            \
+          -DPDC_FORCE_UPDATE          -DPDC_SKIP_ZERO_WIDTH_SPACE \
+          -DPDC_NO_CHECK_ON_RESIZE    -DPDC_CLEAR_ON_RESIZE       \
+          -DPDC_CURSOR_HOME_ON_RESIZE -DPDC_ADDITIONAL_KEYS       \
+          -DPDC_VT_MOUSE_INPUT        -DPDC_DISABLE_CLICK_EVENT   \
+          -DPDC_PASTE_ON_RIGHT_CLICK
+PDCOBJS = $(PDCOBJS) pdcdisp_sub.$(O) pdckbd_sub.$(O)
+!endif
+
 BUILD		= $(CC) -I$(PDCURSES_SRCDIR) -c -Tpe $(CFLAGS) \
-$(WIDEOPT) $(UTF8OPT) $(INFOPT)
+$(WIDEOPT) $(UTF8OPT) $(INFOPT) $(WIN10_JP_OPT)
 BUILD_OS	= $(BUILD) -Xdriver -Wno-deprecated-declarations
 
 LIBEXE		= tlib /C /E /0 /a
