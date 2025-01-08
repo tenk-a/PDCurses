@@ -152,6 +152,37 @@ int doupdate(void)
     else
         clearall = curscr->_clear;
 
+#ifdef PDC_FORCE_UPDATE
+    /* suppress unused variable warning */
+    (void)clearall;
+
+    /* disable cursor visibility */
+    int vis_bkup = SP->visibility;
+    PDC_curs_set(0);
+
+    /* output all lines */
+    for (y = 0; y < SP->lines; y++)
+    {
+        chtype *src = curscr->_y[y];
+        chtype *dest = SP->lastscr->_y[y];
+
+        /* update the screen, and SP->lastscr */
+        PDC_transform_line(y, 0, COLS, src);
+        memcpy(dest, src, COLS * sizeof(chtype));
+
+        curscr->_firstch[y] = _NO_CHANGE;
+        curscr->_lastch[y] = _NO_CHANGE;
+    }
+    curscr->_clear = FALSE;
+
+    /* set cursor position */
+    PDC_gotoyx(curscr->_cury, curscr->_curx);
+
+    /* restore cursor visibility */
+    PDC_curs_set(vis_bkup);
+
+#else
+
     for (y = 0; y < SP->lines; y++)
     {
         PDC_LOG(("doupdate() - Transforming line %d of %d: %s\n",
@@ -219,6 +250,7 @@ int doupdate(void)
 
     if (SP->visibility)
         PDC_gotoyx(curscr->_cury, curscr->_curx);
+#endif
 
     SP->cursrow = curscr->_cury;
     SP->curscol = curscr->_curx;

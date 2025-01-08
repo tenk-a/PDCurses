@@ -178,8 +178,19 @@ static const KPTAB kptab[MAX_KPTAB] =
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
 
+#ifdef PDC_ADDITIONAL_KEYS
+   /* oem key assignments have variation by keyboard                            US JP */
+   {0,          996,       997,         998,        0   }, /* 186 VK_OEM_1      ;: :* */
+   {0,          996,       997,         998,        0   }, /* 187 VK_OEM_PLUS   =+ ;+ */
+   {0,          996,       997,         998,        0   }, /* 188 VK_OEM_COMMA  ,< ,< */
+   {0,          996,       997,         998,        0   }, /* 189 VK_OEM_MINUS  -_ -= */
+   {0,          996,       997,         998,        0   }, /* 190 VK_OEM_PERIOD .> .> */
+   {0,          996,       997,         998,        0   }, /* 191 VK_OEM_2      /? /? */
+   {0,          996,       997,         998,        0   }, /* 192 VK_OEM_3      `~ @` */
+#else
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
+#endif
 
    /* 193 through 218 */
 
@@ -191,6 +202,17 @@ static const KPTAB kptab[MAX_KPTAB] =
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
 
+#ifdef PDC_ADDITIONAL_KEYS
+   /* oem key assignments have variation by keyboard                         US JP */
+   {0,          996,       997,         998,        0   }, /* 219 VK_OEM_4   [{ [{ */
+   {0,          996,       997,         998,        0   }, /* 220 VK_OEM_5   \| \| */
+   {0,          996,       997,         998,        0   }, /* 221 VK_OEM_6   ]} ]} */
+   {0,          996,       997,         998,        0   }, /* 222 VK_OEM_7   '" ^~ */
+   {0,          996,       997,         998,        0   }, /* 223 VK_OEM_8         */
+   {0,          0,         0,           0,          0   }, /* 224 */
+   {0,          0,         0,           0,          0   }, /* 225 */
+   {0,          996,       997,         998,        0   }, /* 226 VK_OEM_102 <> \_ */
+#else
    {0x5B,       0x7B,      0x1B,        ALT_LBRACKET,0  }, /* 219 VK_OEM_4 */
    {0x5C,       0x7C,      0x1C,        ALT_BSLASH, 0   }, /* 220 VK_OEM_5 */
    {0x5D,       0x7D,      0x1D,        ALT_RBRACKET,0  }, /* 221 VK_OEM_6 */
@@ -199,6 +221,7 @@ static const KPTAB kptab[MAX_KPTAB] =
    {0,          0,         0,           0,          0   }, /* 224 */
    {0,          0,         0,           0,          0   }, /* 225 */
    {0,          0,         0,           0,          0   }, /* 226 */
+#endif
 
    /* 227 through 255 */
 
@@ -466,6 +489,40 @@ static int _process_key_event(void)
         idx = vk;
     }
 
+#ifdef PDC_ADDITIONAL_KEYS
+    /* determine keycode */
+    if (state & SHIFT_PRESSED) {
+        int key1 = key;
+        key = enhanced ? ext_kptab[idx].shift : kptab[idx].shift;
+        /* deal with oem key assignments */
+        if (key == 996) {
+            /* preserve keycode for LEFT_ALT + shift + key */
+            key = key1;
+        }
+    } else if (state & (LEFT_CTRL_PRESSED|RIGHT_CTRL_PRESSED)) {
+        key = enhanced ? ext_kptab[idx].control : kptab[idx].control;
+        /* deal with oem key assignments */
+        if (key == 997) {
+            /* get character code from vk */
+            key = MapVirtualKey(vk, MAPVK_VK_TO_CHAR);
+            /* make control character */
+            if (key >= 0x40 && key <= 0x5F) {
+                key -= 0x40;
+            } else if (key == 0x3F) {
+                key += 0x40;
+            }
+        }
+    } else if (state & (LEFT_ALT_PRESSED|RIGHT_ALT_PRESSED)) {
+        key = enhanced ? ext_kptab[idx].alt : kptab[idx].alt;
+        /* deal with oem key assignments */
+        if (key == 998) {
+            /* get character code from vk */
+            key = MapVirtualKey(vk, MAPVK_VK_TO_CHAR);
+        }
+    } else {
+        key = enhanced ? ext_kptab[idx].normal : kptab[idx].normal;
+    }
+#else
     if (state & SHIFT_PRESSED)
         key = enhanced ? ext_kptab[idx].shift : kptab[idx].shift;
 
@@ -477,6 +534,7 @@ static int _process_key_event(void)
 
     else
         key = enhanced ? ext_kptab[idx].normal : kptab[idx].normal;
+#endif
 
     if (key < KEY_CODE_YES)
         SP->key_code = FALSE;
@@ -527,6 +585,9 @@ static int _process_mouse_event(void)
         SP->mouse_status.button[i] =
             (MEV.dwButtonState & button_mask[i]) ? action : 0;
 
+#if PDC_DISABLE_CLICK_EVENT
+    /* disable mouse click event */
+#else
     if (action == BUTTON_PRESSED && MEV.dwButtonState & 7 && SP->mouse_wait)
     {
         /* Check for a click -- a PRESS followed immediately by a release */
@@ -540,6 +601,60 @@ static int _process_mouse_event(void)
 
         if (event_count)
         {
+#if defined(PDC_WIN10_JP) && 1 //@@@ form PDCurses-win10-jp
+            INPUT_RECORD ip[20];
+            DWORD count;
+            bool have_click = FALSE;
+            bool first_event = FALSE;
+            int i2;
+
+#if defined(PDC_WIN10_JP) && defined(PDC_VT_MOUSE_INPUT) 
+            /* for windows 10 jp */
+            /* use vt escape sequence of mouse input */
+            if (pdc_winterm) {
+                /* we can get only one input record (incomplete) */
+                PDC_peek_console_input_w(pdc_con_in, ip, 1, &count);
+            } else {
+                /* get multiple input records */
+                PeekConsoleInput(pdc_con_in, ip, 20, &count);
+            }
+#else
+            /* get multiple input records */
+            PeekConsoleInput(pdc_con_in, ip, 20, &count);
+#endif
+
+            /* check mouse event */
+            for (i2 = 0; i2 < (int)count; i2++)
+            {
+                if (ip[i2].EventType == MOUSE_EVENT)
+                {
+                    for (i = 0; i < 3; i++)
+                    {
+                        if (SP->mouse_status.button[i] == BUTTON_PRESSED &&
+                            !(ip[i2].Event.MouseEvent.dwButtonState & button_mask[i]))
+                        {
+                            SP->mouse_status.button[i] = BUTTON_CLICKED;
+                            have_click = TRUE;
+                            if (i2 == 0) { first_event = TRUE; }
+                        }
+                    }
+                }
+            }
+
+            /* If a click was found, throw out the event */
+            /* (we can drop the first event only (incomplete)) */
+
+            if (have_click && first_event)
+            {
+#if defined(PDC_WIN10_JP) && defined(PDC_VT_MOUSE_INPUT) 
+                /* for windows 10 jp */
+                /* use vt escape sequence of mouse input */
+                PDC_read_console_input_w(pdc_con_in, ip, 1, &count);
+#else
+                ReadConsoleInput(pdc_con_in, ip, 1, &count);
+#endif
+            }
+#else	//@@@ PDCurses
             INPUT_RECORD ip;
             DWORD count;
             bool have_click = FALSE;
@@ -560,8 +675,10 @@ static int _process_mouse_event(void)
 
             if (have_click)
                 ReadConsoleInput(pdc_con_in, &ip, 1, &count);
+#endif	//@@@
         }
     }
+#endif
 
     SP->mouse_status.changes = 0;
 
@@ -630,8 +747,15 @@ int PDC_get_key(void)
     {
         DWORD count;
 
+#if defined(PDC_WIN10_JP) && defined(PDC_VT_MOUSE_INPUT) 
+        /* for windows 10 jp */
+        /* use vt escape sequence of mouse input */
+        PDC_read_console_input_w(pdc_con_in, &save_ip, 1, &count);
+        GetNumberOfConsoleInputEvents(pdc_con_in, &event_count);
+#else
         ReadConsoleInput(pdc_con_in, &save_ip, 1, &count);
         event_count--;
+#endif
 
         if (save_ip.EventType == MOUSE_EVENT ||
             save_ip.EventType == WINDOW_BUFFER_SIZE_EVENT)
@@ -655,12 +779,19 @@ int PDC_get_key(void)
         case WINDOW_BUFFER_SIZE_EVENT:
             if (REV.dwSize.Y != LINES || REV.dwSize.X != COLS)
             {
+#ifdef PDC_NO_CHECK_ON_RESIZE
+                /* skip flag check */
+                SP->resized = TRUE;
+                SP->key_code = TRUE;
+                return KEY_RESIZE;
+#else
                 if (!SP->resized)
                 {
                     SP->resized = TRUE;
                     SP->key_code = TRUE;
                     return KEY_RESIZE;
                 }
+#endif
             }
         }
     }
@@ -685,6 +816,64 @@ bool PDC_has_mouse(void)
 
 int PDC_mouse_set(void)
 {
+#if defined(PDC_WIN10_JP) && 1 //@@@ from PDCurses-win10-jp  TODO: Needs Fix.
+    /* If turning on mouse input: Set ENABLE_MOUSE_INPUT, and clear
+       all other flags, including the extended flags;
+       If turning off the mouse: Set QuickEdit Mode to the status it
+       had on startup, and clear all other flags */
+
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+
+#ifdef PDC_VT_MOUSE_INPUT
+    /* use vt escape sequence of mouse input */
+
+    /* set console mode (input) */
+    if (pdc_winterm) {
+        if (SP->_trap_mbe) {
+            pdc_con_in_mode |=  0x0200; /* enable vt escape sequence input */
+        } else {
+            pdc_con_in_mode &= ~0x0200; /* disable vt escape sequence input */
+        }
+    } else {
+        if (SP->_trap_mbe) {
+            pdc_con_in_mode |=  0x0010; /* mouse input on */
+            pdc_con_in_mode &= ~0x0040; /* quick edit mode off */
+        } else {
+            pdc_con_in_mode &= ~0x0010; /* mouse input off */
+            pdc_con_in_mode |= pdc_quick_edit; /* restore quick edit mode */
+        }
+    }
+    SetConsoleMode(pdc_con_in, pdc_con_in_mode);
+
+    /* enable vt escape sequence of mouse input (sgr-1006) */
+    if (pdc_winterm && SP->_trap_mbe) {
+        HANDLE std_con_out = GetStdHandle(STD_OUTPUT_HANDLE);
+        const char *vt_mouse_input_enable_cmd = "\x1b[?1003;1006h";
+        DWORD written;
+        WriteConsoleA(std_con_out, vt_mouse_input_enable_cmd, strlen(vt_mouse_input_enable_cmd), &written, NULL);
+    }
+#else
+    /* set console mode (input) */
+    if (SP->_trap_mbe) {
+        pdc_con_in_mode |=  0x0010; /* mouse input on */
+        pdc_con_in_mode &= ~0x0040; /* quick edit mode off */
+    } else {
+        pdc_con_in_mode &= ~0x0010; /* mouse input off */
+        pdc_con_in_mode |= pdc_quick_edit; /* restore quick edit mode */
+    }
+    SetConsoleMode(pdc_con_in, pdc_con_in_mode);
+#endif
+
+#else
+    SetConsoleMode(pdc_con_in, SP->_trap_mbe ?
+                   (ENABLE_MOUSE_INPUT|0x0088) : (pdc_quick_edit|0x0088));
+#endif
+
+    memset(&old_mouse_status, 0, sizeof(old_mouse_status));
+
+    return OK;
+#else	//@@@ PDCurses
     DWORD mode;
 
     /* If turning on mouse input: Set ENABLE_MOUSE_INPUT, and clear
@@ -700,6 +889,7 @@ int PDC_mouse_set(void)
     memset(&old_mouse_status, 0, sizeof(old_mouse_status));
 
     return OK;
+#endif //@@@
 }
 
 int PDC_modifiers_set(void)

@@ -409,6 +409,10 @@ void PDC_get_version(PDC_VERSION *ver)
 #ifdef PDC_RGB
         | PDC_VFLAG_RGB
 #endif
+#ifdef PDC_WIN10_JP
+        /* for windows 10 jp */
+        | PDC_VFLAG_WIN10_JP
+#endif
         ;
 
     ver->build = PDC_BUILD;

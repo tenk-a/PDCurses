@@ -34,6 +34,18 @@ short pdc_curstoreal[16], pdc_curstoansi[16];
 short pdc_oldf, pdc_oldb, pdc_oldu;
 bool pdc_conemu, pdc_wt, pdc_ansi;
 
+#ifdef PDC_WIN10_JP
+/* for windows 10 jp */
+DWORD pdc_con_in_mode;       /* console input mode */
+DWORD pdc_con_out_mode;      /* console output mode */
+DWORD pdc_con_in_mode_orig;  /* preserved console input mode */
+DWORD pdc_con_out_mode_orig; /* preserved console output mode */
+bool pdc_mintty;             /* mintty (winpty is needed) detection */
+bool pdc_winterm;            /* Windows Terminal (windows 10) detection */
+int pdc_ambiguous_width;     /* width of ambiguous width characters (=1 or 2) */
+int pdc_emoji_width;         /* width of emoji characters (=1 or 2) */
+#endif
+
 enum { PDC_RESTORE_NONE, PDC_RESTORE_BUFFER };
 
 /* Struct for storing console registry keys, and for use with the
@@ -377,7 +389,11 @@ int PDC_scr_open(void)
     const char *str;
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     HMODULE h_kernel;
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+#else
     BOOL result;
+#endif
     int i;
 
     PDC_LOG(("PDC_scr_open() - called\n"));
@@ -406,6 +422,38 @@ int PDC_scr_open(void)
     pdc_conemu = !!str;
     pdc_ansi = pdc_wt ? TRUE : pdc_conemu ? !strcmp(str, "ON") : FALSE;
 
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+
+    /* mintty (winpty is needed) detection */
+    str = getenv("MSYSCON");
+    pdc_mintty = str ? !strcmp(str, "mintty.exe") : FALSE;
+
+    /* Windows Terminal (windows 10) detection */
+    str = getenv("WT_SESSION");
+    pdc_winterm = !!str;
+    if (pdc_winterm) {
+        /* use vt escape sequence to output colors and attributes */
+        pdc_ansi = TRUE;
+    }
+
+    /* set width of ambiguous width characters */
+    str = getenv("PDC_AMBIGUOUS_WIDTH");
+    if (str) {
+        pdc_ambiguous_width = !strcmp(str, "2") ? 2 : 1;
+    } else {
+        pdc_ambiguous_width = pdc_winterm ? 1 : 2;
+    }
+
+    /* set width of emoji characters */
+    str = getenv("PDC_EMOJI_WIDTH ");
+    if (str) {
+        pdc_emoji_width = !strcmp(str, "2") ? 2 : 1;
+    } else {
+        pdc_emoji_width = 2;
+    }
+#endif
+
     GetConsoleScreenBufferInfo(pdc_con_out, &csbi);
     GetConsoleScreenBufferInfo(pdc_con_out, &orig_scr);
     GetConsoleMode(pdc_con_in, &old_console_mode);
@@ -415,6 +463,13 @@ int PDC_scr_open(void)
        cleared */
 
     pdc_quick_edit = old_console_mode & 0x0040;
+
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+    /* preserve console mode (input/output) */
+    GetConsoleMode(pdc_con_in,  &pdc_con_in_mode_orig);
+    GetConsoleMode(pdc_con_out, &pdc_con_out_mode_orig);
+#endif
 
     SP->mouse_wait = PDC_CLICK_PERIOD;
     SP->audible = TRUE;
@@ -454,10 +509,35 @@ int PDC_scr_open(void)
 
     SP->_preserve = (getenv("PDC_PRESERVE_SCREEN") != NULL);
 
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+
+    /* set console mode (input) */
+    pdc_con_in_mode = 0x0088 | pdc_quick_edit;
+    SetConsoleMode(pdc_con_in, pdc_con_in_mode);
+
+    /* set console mode (output) */
+    pdc_con_out_mode = 0;
+    if (SetConsoleMode(pdc_con_out, 0x0015)) {
+        pdc_con_out_mode = 0x0015; /* LVB + VT + PROCESSED_OUTPUT */
+    } else if (SetConsoleMode(pdc_con_out, 0x0010)) {
+        pdc_con_out_mode = 0x0010; /* LVB */
+    } else {
+        SetConsoleMode(pdc_con_out, 0);
+    }
+#endif
+
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+    if (pdc_con_out_mode & 0x0010) {
+        SP->termattrs |= A_UNDERLINE | A_LEFT | A_RIGHT;
+    }
+#else
     /* ENABLE_LVB_GRID_WORLDWIDE */
     result = SetConsoleMode(pdc_con_out, 0x0010);
     if (result)
         SP->termattrs |= A_UNDERLINE | A_LEFT | A_RIGHT;
+#endif
 
     PDC_reset_prog_mode();
 
@@ -528,6 +608,15 @@ int PDC_resize_screen(int nlines, int ncols)
     if (nlines < 2 || ncols < 2)
         return ERR;
 
+#ifdef PDC_CURSOR_HOME_ON_RESIZE
+    /* workaround for windows console problem on resize
+       ( https://github.com/microsoft/terminal/issues/1976 ) */
+    COORD coord;
+    coord.X = 0;
+    coord.Y = 0;
+    SetConsoleCursorPosition(pdc_con_out, coord);
+#endif
+
     max = GetLargestConsoleWindowSize(pdc_con_out);
 
     rect.Left = rect.Top = 0;
@@ -554,6 +643,19 @@ int PDC_resize_screen(int nlines, int ncols)
     }
     SetConsoleActiveScreenBuffer(pdc_con_out);
 
+#ifdef PDC_CLEAR_ON_RESIZE
+    /* clear console */
+    WORD  attr = 0x0007;
+    WCHAR ch = 0x0020;
+    DWORD len = size.X * size.Y;
+    COORD coord2;
+    DWORD written;
+    coord2.X = 0;
+    coord2.Y = 0;
+    FillConsoleOutputAttribute(pdc_con_out, attr, len, coord2, &written);
+    FillConsoleOutputCharacterW(pdc_con_out, ch, len, coord2, &written);
+#endif
+
     PDC_flushinp();
 
     return OK;
@@ -569,6 +671,15 @@ void PDC_reset_prog_mode(void)
     {
         COORD bufsize;
         SMALL_RECT rect;
+
+#ifdef PDC_CURSOR_HOME_ON_RESIZE
+        /* workaround for windows console problem on resize
+           ( https://github.com/microsoft/terminal/issues/1976 ) */
+        COORD coord;
+        coord.X = 0;
+        coord.Y = 0;
+        SetConsoleCursorPosition(pdc_con_out, coord);
+#endif
 
         bufsize.X = orig_scr.srWindow.Right - orig_scr.srWindow.Left + 1;
         bufsize.Y = orig_scr.srWindow.Bottom - orig_scr.srWindow.Top + 1;
@@ -594,6 +705,16 @@ void PDC_reset_shell_mode(void)
         SetConsoleActiveScreenBuffer(std_con_out);
     else if (is_nt)
     {
+
+#ifdef PDC_CURSOR_HOME_ON_RESIZE
+        /* workaround for windows console problem on resize
+           ( https://github.com/microsoft/terminal/issues/1976 ) */
+        COORD coord;
+        coord.X = 0;
+        coord.Y = 0;
+        SetConsoleCursorPosition(pdc_con_out, coord);
+#endif
+
         SetConsoleScreenBufferSize(pdc_con_out, orig_scr.dwSize);
         SetConsoleWindowInfo(pdc_con_out, TRUE, &orig_scr.srWindow);
         SetConsoleScreenBufferSize(pdc_con_out, orig_scr.dwSize);
@@ -601,7 +722,26 @@ void PDC_reset_shell_mode(void)
         SetConsoleActiveScreenBuffer(pdc_con_out);
     }
 
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+
+#ifdef PDC_VT_MOUSE_INPUT
+    /* use vt escape sequence of mouse input */
+
+    /* disable vt escape sequence of mouse input (sgr-1006) */
+    if (pdc_winterm && SP->_trap_mbe) {
+        const char *vt_mouse_input_disable_cmd = "\x1b[?1003;1006l";
+        DWORD written;
+        WriteConsoleA(std_con_out, vt_mouse_input_disable_cmd, strlen(vt_mouse_input_disable_cmd), &written, NULL);
+    }
+#endif
+
+    /* restore console mode (input/output) */
+    SetConsoleMode(pdc_con_in,  pdc_con_in_mode_orig);
+    SetConsoleMode(pdc_con_out, pdc_con_out_mode_orig);
+#else
     SetConsoleMode(pdc_con_in, old_console_mode | 0x0080);
+#endif
 }
 
 void PDC_restore_screen_mode(int i)

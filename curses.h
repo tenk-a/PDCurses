@@ -124,7 +124,11 @@ enum
     PDC_VFLAG_WIDE  = 2,  /* -DPDC_WIDE */
     PDC_VFLAG_UTF8  = 4,  /* -DPDC_FORCE_UTF8 */
     PDC_VFLAG_DLL   = 8,  /* -DPDC_DLL_BUILD */
-    PDC_VFLAG_RGB   = 16  /* -DPDC_RGB */
+    PDC_VFLAG_RGB   = 16, /* -DPDC_RGB */
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+    PDC_VFLAG_WIN10_JP = 0x4000  /* -DPDC_WIN10_JP */
+#endif
 };
 
 /*----------------------------------------------------------------------

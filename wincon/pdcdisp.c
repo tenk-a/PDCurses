@@ -27,7 +27,15 @@ void PDC_gotoyx(int row, int col)
     coord.X = col;
     coord.Y = row;
 
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+    COORD disp_size;
+    disp_size.X = SP->cols;
+    disp_size.Y = SP->lines;
+    PDC_set_console_cursor_position(pdc_con_out, coord, disp_size, curscr->_y[row]);
+#else
     SetConsoleCursorPosition(pdc_con_out, coord);
+#endif
 }
 
 void _set_ansi_color(short f, short b, attr_t attr)
@@ -126,6 +134,12 @@ void _set_ansi_color(short f, short b, attr_t attr)
     if (strlen(esc) > 2)
     {
         sprintf(p, "m");
+
+#ifdef PDC_WIN10_JP
+        /* for windows 10 jp */
+        DWORD written;
+        WriteConsoleA(pdc_con_out, esc, strlen(esc), &written, NULL);
+#else
         if (!pdc_conemu)
             SetConsoleMode(pdc_con_out, 0x0015);
 
@@ -133,6 +147,7 @@ void _set_ansi_color(short f, short b, attr_t attr)
 
         if (!pdc_conemu)
             SetConsoleMode(pdc_con_out, 0x0010);
+#endif
     }
 }
 
@@ -142,6 +157,14 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
     short fore, back;
     bool blink, ansi;
 
+    /* check buffer length */
+    if (len <= 0 || len > 512) {
+        return;
+    }
+
+#ifdef PDC_WIN10_JP
+    /* for windows 10 jp */
+#else
     if (pdc_ansi && (lineno == (SP->lines - 1)) && ((x + len) == SP->cols))
     {
         len--;
@@ -152,6 +175,7 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
         pdc_ansi = TRUE;
         return;
     }
+#endif
 
     pair_content(PAIR_NUMBER(attr), &fore, &back);
     ansi = pdc_ansi || (fore >= 16 || back >= 16);
@@ -196,18 +220,35 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
 
         PDC_gotoyx(lineno, x);
         _set_ansi_color(fore, back, attr);
+#ifdef PDC_WIN10_JP
+        /* for windows 10 jp */
+        COORD cur_pos;
+        COORD disp_size;
+        DWORD written;
+        cur_pos.X = x;
+        cur_pos.Y = lineno;
+        disp_size.X = SP->cols;
+        disp_size.Y = SP->lines;
+        PDC_write_console_w(pdc_con_out, buffer, len, &written, cur_pos, disp_size, curscr->_y[lineno]);
+#else
 #ifdef PDC_WIDE
         WriteConsoleW(pdc_con_out, buffer, len, NULL, NULL);
 #else
         WriteConsoleA(pdc_con_out, buffer, len, NULL, NULL);
 #endif
+#endif
     }
     else
 NONANSI:
     {
+#ifdef PDC_WIN10_JP
+        /* for windows 10 jp */
+        WCHAR buffer[512];
+#else
         CHAR_INFO buffer[512];
         COORD bufSize, bufPos;
         SMALL_RECT sr;
+#endif
         WORD mapped_attr;
 
         fore = pdc_curstoreal[fore];
@@ -235,10 +276,26 @@ NONANSI:
             if (blink && blinked_off)
                 ch = ' ';
 
+#ifdef PDC_WIN10_JP
+            /* for windows 10 jp */
+            buffer[j] = ch & A_CHARTEXT;
+#else
             buffer[j].Attributes = mapped_attr;
             buffer[j].Char.UnicodeChar = ch & A_CHARTEXT;
+#endif
         }
 
+#ifdef PDC_WIN10_JP
+        /* for windows 10 jp */
+        COORD cur_pos;
+        COORD disp_size;
+        DWORD written;
+        cur_pos.X = x;
+        cur_pos.Y = lineno;
+        disp_size.X = SP->cols;
+        disp_size.Y = SP->lines;
+        PDC_write_console_w_with_attribute(pdc_con_out, buffer, len, &written, mapped_attr, cur_pos, disp_size, curscr->_y[lineno]);
+#else
         bufPos.X = bufPos.Y = 0;
         bufSize.X = len;
         bufSize.Y = 1;
@@ -248,6 +305,7 @@ NONANSI:
         sr.Right = x + len - 1;
 
         WriteConsoleOutput(pdc_con_out, buffer, bufSize, bufPos, &sr);
+#endif
     }
 }
 

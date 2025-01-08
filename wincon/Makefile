@@ -1,6 +1,6 @@
 # GNU Makefile for PDCurses - Windows console
 #
-# Usage: make [-f path\Makefile] [DEBUG=Y] [DLL=Y] [WIDE=Y] [UTF8=Y]
+# Usage: make [-f path\Makefile] [DEBUG=Y] [DLL=Y] [WIDE=Y] [UTF8=Y] [WIN10_JP=Y]
 #        [INFOEX=N] [tgt]
 #
 # where tgt can be any of:
@@ -12,6 +12,11 @@ E = .exe
 ifeq ($(OS),Windows_NT)
 	RM = cmd /c del
 else
+	RM = rm -f
+endif
+
+# for MSYS2/MinGW-w64
+ifneq ($(MSYSTEM),)
 	RM = rm -f
 endif
 
@@ -31,16 +36,29 @@ AR		= ar
 STRIP		= strip
 LINK		= gcc
 WINDRES		= windres
+WINDRES_FLAGS	=
 
 ifeq ($(DEBUG),Y)
-	CFLAGS  = -g -Wall -DPDCDEBUG
+	CFLAGS  = -g -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type -DPDCDEBUG
 	LDFLAGS = -g
 else
-	CFLAGS  = -O2 -Wall
+	CFLAGS  = -O2 -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type
 	LDFLAGS =
 endif
 
 CFLAGS += -I$(PDCURSES_SRCDIR)
+
+# for windows 10 jp
+ifeq ($(WIN10_JP),Y)
+	CFLAGS += -DPDC_WIN10_JP  -DPDC_WIDE  -DPDC_FORCE_UTF8            \
+	          -DPDC_FORCE_UPDATE          -DPDC_SKIP_ZERO_WIDTH_SPACE \
+	          -DPDC_NO_CHECK_ON_RESIZE    -DPDC_CLEAR_ON_RESIZE       \
+	          -DPDC_CURSOR_HOME_ON_RESIZE -DPDC_ADDITIONAL_KEYS       \
+	          -DPDC_VT_MOUSE_INPUT        -DPDC_DISABLE_CLICK_EVENT   \
+	          -DPDC_PASTE_ON_RIGHT_CLICK
+	PDCOBJS += pdcdisp_sub.o pdckbd_sub.o
+	WINDRES_FLAGS += -DPDC_WIN10_JP
+endif
 
 ifeq ($(WIDE),Y)
 	CFLAGS += -DPDC_WIDE
@@ -85,10 +103,11 @@ ifneq ($(DEBUG),Y)
 endif
 
 $(LIBCURSES) : $(LIBOBJS) $(PDCOBJS) $(RESOURCE)
-	$(LIBEXE) $(LIBFLAGS) $@ $?
+	#$(LIBEXE) $(LIBFLAGS) $@ $?
+	$(LIBEXE) $(LIBFLAGS) $@ $^
 
 pdcurses.o: $(common)/pdcurses.rc
-	$(WINDRES) -i $(common)/pdcurses.rc pdcurses.o
+	$(WINDRES) $(WINDRES_FLAGS) -i $(common)/pdcurses.rc pdcurses.o
 
 $(LIBOBJS) $(PDCOBJS) : $(PDCURSES_HEADERS)
 $(PDCOBJS) : $(PDCURSES_WIN_H)
