@@ -1,466 +1,107 @@
-# PDCurses-win10-jp
-
-|OK (Windows 10)|NG (Windows 10)|
-|---|---|
-|![image](image.png)|![image](image_NG.png)|
-
-## 概要
-- PDCurses の Windows Console 用ポート (wincon) を、  
-  Windows 10 上での日本語表示が改善するように、改造したものです。
-
-- (Windows 8.1 までは、非改造でも表示できていましたが、  
-  Winddows 10 で、Windows Console API の互換性がなくなり、  
-  日本語表示が大きく乱れるようになりました)
-
-- オリジナルの PDCurses の情報は、以下にあります。  
-  https://github.com/wmcbrine/PDCurses  
-  その v3.9 (コミット 618e0aa) (2019-12-22) をベースに改造を行いました。
-
-- 変更の差分は、以下のページで確認できます。  
-  https://github.com/Hamayama/PDCurses-win10-jp/compare/pdcurses-3.9-orig-618e0aa...master
-
-
-## 変更点
-- オリジナルからの変更点を、以下に示します。
-
-1. トップディレクトリに Makefile と Makefile_win8 を追加  
-   MSYS2/MinGW-w64 環境で、PDCurses の Windows Console 用ポート (wincon) を、  
-   ビルドするための Makefile を追加した。  
-   Makefile が Windows 10 用で、Makefile_win8 が Windows 8.1 以前用になる。  
-   (基本的に、Makefile_win8 を使うと、非改造のビルドになる)  
-   
-   そして、トップディレクトリ上で、make を実行すると、  
-   0000_dist というフォルダを生成して、その中に成果物を格納するようにした。  
-   (このとき、ヘッダーファイルについては、`include/pdcurses.h` を自動生成して、  
-   そこから 本来のヘッダーファイルを参照するようにした。  
-   (これは、MSYS2/MinGW-w64 の PDCurses パッケージの方式に合わせたものである))
-
-2. バージョンフラグの追加  
-   `( curses.h  pdcurses/initscr.c )`  
-   PDC_get_version() で取得できるバージョン情報の構造体 (PDC_VERSION)  
-   の flags メンバに、PDC_VFLAG_WIN10_JP ( 0x4000 ) の値を追加した。
-
-3. 内部キャッシュの無効化  
-   `( pdcurses/refresh.c )`  
-   もともと、refresh (doupdate) 時は、差分だけを描画する処理になっていた。  
-   しかし、文字幅の変化による更新もれが発生したため、  
-   毎回、画面全体を描画するように変更した。  
-   → その後、本機能は、シンボル PDC_FORCE_UPDATE を define することで、  
-   有効になるようにした。  
-   現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。
-
-4. wincon の Makefile の変更  
-   `( wincon/Makefile )`  
-   WIN10_JP フラグの追加等。
-
-5. Windows Console API の変更対応  
-   `( wincon/pdcwin.h  wincon/pdcdisp.c  wincon/pdcdisp_sub.c )`  
-   SetConsoleCursorPosition() が、Windows 10 では、  
-   文字数ではなく文字幅単位 (全角文字を 2 と数える) で、  
-   X座標を指定するように変わったため、対応した。  
-   (Windows 8.1 までは、( chcp 65001 の場合は) 文字数で指定するようになっていた。  
-   (これは、日本語版 Windows の固有の動作だったのかもしれない。。。))  
-   
-   また、画面の幅を超えて表示しようとした場合には、  
-   はみ出した部分を出力しないようにした。  
-   
-   また、ゼロ幅スペース (U+200B) については、  
-   シンボル PDC_SKIP_ZERO_WIDTH_SPACE を define することで、  
-   表示をスキップできるようにした。  
-   (Windows 8.1 までは、ゼロ幅スペース (U+200B) は、ゼロ幅で表示できていたが、  
-   Windows 10 では、半角幅で表示されるようになったもよう)  
-   現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。  
-   (本機能は、PDC_WIN10_JP が define されていないと、有効にならない)  
-   
-   (実装の詳細については、[wincon/pdcdisp_sub.c][1] を参照)
-
-6. 文字幅を取得するための処理を追加。  
-   `( wincon/pdcwin.h  wincon/pdcscrn.c  wincon/pdcdisp_sub.c )`  
-   Unicode の EastAsianWidth.txt および emoji-data.txt を元に、  
-   文字幅を取得する処理を追加した。  
-   (Unicode データの入手先は以下。  
-   https://unicode.org/Public/UNIDATA/EastAsianWidth.txt  
-   https://unicode.org/Public/UNIDATA/emoji/emoji-data.txt  
-   また、データ抽出用のツールは、[tools_unicode][3] フォルダに入れておいた。  
-   (ツールの実行には Gauche が必要))  
-   (実装の詳細については、[wincon/pdcdisp_sub.c][1] を参照)  
-   
-   また、環境変数 PDC_AMBIGUOUS_WIDTH と PDC_EMOJI_WIDTH により、  
-   あいまいな幅の文字 (ambiguous width character) と 絵文字の幅を指定可能にした。  
-   (それぞれ 1 か 2 を指定する)  
-   理論上は、表示するフォントの幅と、この環境変数の設定が一致していれば、  
-   うまく表示されるはずである。  
-   しかし、mintty (winpty が必要) や ConEmu では、実際に表示しているフォントとは別に、  
-   裏に隠れているコマンドプロンプトのフォントの情報が内部で使用されているようで、  
-   どう設定してもうまくいかなかった (カーソルの表示位置がずれたりする) 。  
-   結局、これらの環境変数は、現状、設定する意味がない。
-
-7. ~~画面の右端に余白を設ける機能を追加  
-   `( wincon/pdcwin.h  wincon/pdcgetsc.c )`  
-   シンボル PDC_RIGHT_MARGIN を define することで、  
-   画面の右端に余白を設定できるようにした (0 か 1 を指定する) 。  
-   これは、Windows Console API (WriteConsoleW) で画面の右端に文字を表示すると、  
-   自動改行等により不具合が発生するようにみえたため、追加した。  
-   (ただ、デバッグ中の勘違いだったのかもしれない。。。)  
-   現状、Makefile では、Windows 10 の場合のみ、1 を指定するようにしている。~~  
-   → 本機能は削除した
-
-8. mintty (winpty が必要) のときは、色数を 16 色に制限する処理を追加  
-   `( wincon/pdcsetsc.c )`  
-   これは、winpty の制約と思われる (16 色しか表示できない)。  
-   (Windows 8.1 では、VT エスケープシーケンスに非対応のため、  
-   結果的に 16 色設定 ( COLORS = 16 ) となっており、問題がなかった)
-
-9. 画面のリサイズイベントの発生条件を緩和  
-   `( wincon/pdckbd.c )`  
-   もともと、リサイズイベントの発生後は、resize_term() を呼ぶまでは、  
-   次回のリサイズイベントが発生しないようにガードされていた。  
-   これを、シンボル PDC_NO_CHECK_ON_RESIZE を define することで、  
-   このガードを外すことができるようにした。  
-   現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。
-
-10. 画面リサイズ時の画面クリア  
-    `( wincon/pdcscrn.c )`  
-    シンボル PDC_CLEAR_ON_RESIZE を define することで、  
-    resize_term() の実行時に画面をクリアできるようにした。  
-    現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。
-
-11. リソースファイルの FileDescription を変更  
-    `( common/pdcurses.rc )`  
-    pdcurses.dll のファイルのプロパティで、改造版であることを確認できるようにした。
-
-12. 初期化の追加  
-    `( wincon/pdckbd.c )`  
-    配列変数 ext_kptab[] の初期化に不足分があったため、追加した。  
-    (static 変数の初期値は 0 なので、問題はないと思われるが、  
-    コンパイル時に警告が出ていたため、追加した)  
-    また、配列変数 kptab[] について、要素数 256 まで初期化するようにした。  
-    (MinGW-w64 のヘッダーファイルを見ると、VK_OEM_CLEAR (0xFE) までは 定義されていたため)  
-    また、配列変数 kptab[] の範囲外にアクセスしないように、チェック処理を追加した。  
-    また、配列変数 kptab[] と ext_kptab[] を、const にした。
-
-13. 画面リサイズ時に、カーソルをホームポジション (0,0) に移動  
-    `( wincon/pdcscrn.c )`  
-    シンボル PDC_CURSOR_HOME_ON_RESIZE を define することで、  
-    resize_term() の実行時に、カーソルをホームポジション (0,0) に移動するようにした。  
-    これによって、Windows 10 で、画面リサイズ時に Windows Console が異常終了する現象を  
-    回避できるようになった。  
-    (参考URL：https://github.com/microsoft/terminal/issues/1976 )  
-    現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。
-
-14. いくつかのキー入力を受け付けるように変更  
-    `( wincon/pdckbd.c )`  
-    シンボル PDC_ADDITIONAL_KEYS を define することで、  
-    「;」「:」「,」「-」「.」「/」「@」「^」の各キーについて、  
-    Ctrl キーもしくは Alt キーとの同時押しを受け付けられるようにした。  
-    (今までは、キー入力イベントが発生しなかった)  
-    また、キーボードの OEM 関連キーのバリエーションに対応するため、  
-    これらのキーについては、Windows に文字コードを問い合わせるようにした。  
-    (例えば、OEM_1 キーは、US キーボードでは「;」になり JIS キーボードでは「:」になる)  
-    現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。
-
-15. SetConsoleMode() の処理見直し  
-    `( wincon/pdcwin.h  wincon/pdcscrn.c  wincon/pdcsetsc.c  wincon/pdckbd.c )`  
-    (複数の箇所で設定されており、最終的な状態がよく分からなかったため、)  
-    現在の状態を、変数で管理するようにした。
-
-16. Windows Terminal で、マウス操作に対応  
-    `( wincon/pdcwin.h  wincon/pdcscrn.c  wincon/pdckbd.c  wincon/pdckbd_sub.c )`  
-    現状、Windows Terminal では、Windows Console API のマウスイベント関連が、  
-    未実装となっている。  
-    https://github.com/microsoft/terminal/issues/376  
-    このため、シンボル PDC_VT_MOUSE_INPUT を define することで、  
-    Windows Terminal の場合に、  
-    VT エスケープシーケンスによるマウス入力を受け付けられるようにした。  
-    (実装の詳細については、[wincon/pdckbd_sub.c][2] を参照)  
-    現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。  
-    (本機能は、PDC_WIN10_JP が define されていないと、有効にならない)
-
-17. マウスクリックイベントの検出を無効化  
-    `( wincon/pdckbd.c )`  
-    シンボル PDC_DISABLE_CLICK_EVENT を define することで、  
-    マウスクリックイベントの検出を無効化できるようにした。  
-    (押し下げと押し上げイベントのみになる)  
-    ~~これは、Windows Terminal で、マウスのボタンを長押しすると、  
-    押し下げイベントが 2 回発生して、  
-    マウスクリックイベントの判定を誤るケースが出たため、追加した。  
-    → 本機能は削除した  
-    (押し下げイベントが 2 回発生するというのは、  
-    コマンド (VT エスケープシーケンス) の解釈ミスだった)~~  
-    → 本機能は、一度削除したが、  
-    結局、マウスクリックイベントの検出が不完全であるため、復活させた。  
-    (キーボードを押し続けてリピート状態にした場合、うまく検出できない等)  
-    現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。  
-    (すなわち、マウスクリックイベントの検出を無効化している)
-
-18. Cppcheck のチェック結果の対応  
-    `( pdcurses/addstr.c  pdcurses/insstr.c )`  
-    配列アクセスよりも前に、index をチェックするようにした。
-
-19. マウスによるコピー&ペースト処理を修正  
-    `( curspriv.h  getch.c  pdcdisp_sub.c )`  
-    PDCurses では、(端末側で処理されていなければ)  
-    Shift + ボタン1 のドラッグでコピー、  
-    Shift + ボタン2 のクリックでペーストが可能となっている。  
-    この処理について、文字幅を考慮するように修正した。  
-    (ただし、現状、画面幅をはみ出した領域もコピーしてしまう問題がある)  
-    また、PDC_DISABLE_CLICK_EVENT を define していると、  
-    ペーストができなかったため、修正した。  
-    また、PDC_PASTE_ON_RIGHT_CLICK を define することで、  
-    Shift + ボタン2 (中ボタン) ではなく、Shift + ボタン3 (右ボタン) でペーストできるようにした。  
-    現状、Makefile では、Windows 10 の場合のみ、本機能を有効にしている。
-
-
-## インストール方法
-- MSYS2/MinGW-w64 (64bit) 環境でのインストール手順を、以下に示します。  
-  A または B のどちらかの方法で、インストールを実施ください。
-
-＜A：パッケージファイルでインストールする場合＞
-
-1. MSYS2/MinGW-w64 (64bit/32bit) 用のパッケージファイルを用意しています。  
-   以下のページを参照して、インストールを実施ください。  
-   https://github.com/Hamayama/PDCurses-win10-jp-package
-
-＜B：ソースコードからビルドしてインストールする場合＞
-
-1. MSYS2/MinGW-w64 (64bit) のインストール  
-   事前に MSYS2/MinGW-w64 (64bit) がインストールされている必要があります。  
-   以下のページを参考に、開発環境のインストールを実施ください。  
-   https://gist.github.com/Hamayama/eb4b4824ada3ac71beee0c9bb5fa546d  
-   (すでにインストール済みであれば本手順は不要です)
-
-2. PDCurses のソースの展開  
-   本サイト ( https://github.com/Hamayama/PDCurses-win10-jp ) のソースを、  
-   (Download Zip ボタン等で) ダウンロードして、作業用のフォルダに展開してください。  
-   例えば、作業用のフォルダを c:\work とすると、  
-   c:\work\PDCurses の下にファイル一式が配置されるように展開してください。  
-   (注意) 作業用フォルダのパスには、空白を入れないようにしてください。
-
-3. PDCurses のコンパイル  
-   プログラムメニューから MSYS2 の MinGW 64bit Shell を起動して、以下のコマンドを実行してください。  
-   ( c:\work にソースを展開した場合)  
-   ＜Windows 10 の場合＞
-   ```
-     cd /c/work/PDCurses
-     make
-   ```
-   ＜Windows 8.1 以前の場合＞
-   ```
-     cd /c/work/PDCurses
-     make -f Makefile_win8
-   ```
-
-4. PDCurses のインストール  
-   コンパイルに成功すると、PDCurses フォルダ内の 0000_dist フォルダの中に、  
-   bin フォルダと include フォルダと lib フォルダが生成されます。  
-   
-   bin フォルダの中身を、`C:\msys64\mingw64\bin` フォルダ内にコピーしてください。  
-   include フォルダの中身を、`C:\msys64\mingw64\include` フォルダ内にコピーしてください。  
-   lib フォルダの中身を、`C:\msys64\mingw64\lib` フォルダ内にコピーしてください。  
-   
-   (注意) もし、Lem エディタ ( https://github.com/cxxxr/lem ) のライブラリとして使用する場合には、  
-   `C:\msys64\mingw64\include` フォルダ内の pdcurses.h をさらにコピーして、  
-   ncurses.h という名前で同じフォルダ内 ( `C:\msys64\mingw64\include` ) に配置してください。  
-   (この名前のヘッダーファイルしか認識しないため)
-
-- 以上です。
-
-
-## 使用例
-- MinGW 用のサンプルソースを、[demos_mingw][4] フォルダに格納しました。  
-  widetest.c が日本語表示のサンプルで、inputtest.c がキー/マウス入力のサンプルです。  
-  0000_compile.bat を実行すると、コンパイルを行い、実行ファイルが生成されます。
-
-- また、実用例としては、Lem エディタのフロントエンドとして、本ライブラリを使用しています。  
-  https://github.com/cxxxr/lem  
-  https://github.com/cxxxr/lem/wiki/Windows-Platform
-
-
-## その他 問題点等
-1. 座標の指定について  
-   現状、座標の指定については、文字単位で行うようになっている。  
-   すなわち、画面左上の「`あいう`」の後ろに文字を表示したい場合には、  
-   `mvaddstr(0, 3, "え");` のように指定することになる。  
-   しかし、例えば Linux の ncurses では、セル単位の指定になっており、  
-   `mvaddstr(0, 6, "え");` のように指定することになる。  
-   この非互換性は、問題になるかもしれない。  
-   (しかし、セル単位の指定にした場合、ゼロ幅の文字が連続したときに、  
-   途中を指定することができないという別の問題が生じるが。。。)
-
-2. UTF-16 のサロゲートペアの文字 (U+10000 以上) については、  
-   現状、すべて全角幅扱いとしている (不完全)
-
-3. ゼロ幅文字については、現状、ゼロ幅スペース (U+200B) のみ考慮している  
-   (ただし、単に表示をスキップするため、クリップボードにコピーすることはできない)
-
-4. 合字については、現状、非対応
-
-5. ConEmu で、24bit カラーモードにすると、色付けの範囲が変になる (Windows 10)  
-   (16 色モードは正常。Settings メニューの Features - Colors に選択がある)
-
-6. ConEmu で、あいまいな幅の文字 (ambiguous width character) を表示すると、  
-   カーソルの表示位置がずれる (Windows 10)  
-   (表示幅が半角で、内部情報が全角になっているためと思われる)
-
-7. mintty (winpty が必要) で、あいまいな幅の文字 (ambiguous width character)  
-   を表示すると、カーソルの表示位置がずれる (Windows 10)  
-   (表示幅が半角で、内部情報が全角になっているためと思われる)
-
-8. 画面をリサイズすると、異常終了することがある  
-   ~~→ リサイズ直後に変更前の範囲に文字を書き込むと発生するもよう。  
-   リサイズイベントの受信後は、一定時間書き込まないようにすることで、  
-   発生頻度を下げられる。しかし、完全になくすことはできなさそう。  
-   (Windows Console API 側でガードすべき問題だと思うが。。。)~~  
-   → 以下が原因だったもよう  
-   https://github.com/microsoft/terminal/issues/1976  
-   対策として、シンボル PDC_CURSOR_HOME_ON_RESIZE を define することで、  
-   resize_term() の実行時に、カーソルをホームポジション (0,0) に移動するようにした。
-
-9. ConEmu で、画面幅を半角50桁未満にすると、高確率で異常終了する  
-   → 上記 8. の対策により、異常終了はしなくなったもよう。しかし、表示は乱れる。  
-   (内部情報が、50桁未満にはならないのかも)
-
-10. mintty (winpty が必要) で、画面をリサイズすると、異常終了することがある (Windows 10)  
-    → これは、winpty 側で、上記 8. と同様の対策が必要であった。  
-    https://github.com/Hamayama/winpty-fixes  
-    の方で修正した。
-
-11. コマンドプロンプト (cmd.exe) で、絵文字を表示できない
-
-12. ConEmu で、絵文字を表示できない (Windows 10)
-
-13. mintty (winpty が必要) で、絵文字を表示できない (Windows 10)
-
-14. Windows Terminal で、マウスイベントが取れない (Windows 10)  
-    現状、Windows Terminal では、Windows Console API のマウスイベント関連が、  
-    未実装となっている。  
-    https://github.com/microsoft/terminal/issues/376  
-    ( VT エスケープシーケンスのみ、マウス入力に対応している )  
-    → VT エスケープシーケンスによるマウス入力を受け付けられるようにした。
-
-15. Windows Terminal で、Alt + 矢印キー が入力できない (Windows 10)  
-    → Windows Terminal で、Pane 機能 (画面分割) 関連の操作キーとなっているため。  
-    https://github.com/microsoft/terminal/issues/3729  
-    Windows Terminal の設定ファイル (settings.json) 内の  
-    キーバインドの設定箇所に以下を追加すると、入力可能になる。
-    ```
-        { "command": "unbound", "keys": [ "alt+down" ] },
-        { "command": "unbound", "keys": [ "alt+left" ] },
-        { "command": "unbound", "keys": [ "alt+right" ] },
-        { "command": "unbound", "keys": [ "alt+up" ] },
-        { "command": "unbound", "keys": [ "alt+shift+down" ] },
-        { "command": "unbound", "keys": [ "alt+shift+left" ] },
-        { "command": "unbound", "keys": [ "alt+shift+right" ] },
-        { "command": "unbound", "keys": [ "alt+shift+up" ] },
-    ```
-
-16. その他、Windows Terminal の不具合情報 (Windows 10)
-    - 日本語入力 (IME) の未確定文字列が、画面上に重なって表示される。  
-      https://github.com/microsoft/terminal/issues/6192
-    - 絵文字の入力が化けてエコー表示される (アプリへの入力は正常)。  
-      https://github.com/microsoft/terminal/issues/1503
-    - リサイズしてから、アプリ (vim 等) を終了すると、ゴミが表示される。  
-      その状態で、再度、アプリを起動すると、表示が崩れる。  
-      (古い画面サイズが、アプリに通知されているもよう)  
-      https://github.com/microsoft/terminal/issues/7466  
-      https://github.com/microsoft/terminal/issues/3088
-    - ~~アプリ (vim 等) を開き、全角文字の行の折り返し表示がある状態にして、  
-      画面幅を変更すると、異常終了する。  
-      https://github.com/microsoft/terminal/issues/9547  
-      https://github.com/microsoft/terminal/issues/4907~~  
-      → これは修正されました。
-
-17. コマンドプロンプト (cmd.exe) で、  
-    Shift + マウスボタン によるコピー&ペーストがうまくできない (Windows 10)  
-    → 文字幅を考慮するように修正した。  
-    また、Shift + ボタン2 (中ボタン) ではなく、Shift + ボタン3 (右ボタン) でペーストできるようにした。  
-    (Windows Terminal 等の他の端末では、マウスの Shift + ボタン 操作が端末側で処理されるため、  
-    問題が出なかったもよう)
-
-
-## 環境等
-- OS
-  - Windows 10 (version 20H2) (64bit)
-  - Windows 8.1 (64bit)
-- 環境
-  - MSYS2/MinGW-w64 (64bit) (gcc version 10.2.0 (Rev10, Built by MSYS2 project)) (Windows 10)
-  - MSYS2/MinGW-w64 (64bit) (gcc version 9.2.0 (Rev2, Built by MSYS2 project)) (Windows 8.1)
-  - winpty-fixes 0.4.4-dev ( https://github.com/Hamayama/winpty-fixes ) (Windows 10)
-  - winpty 0.4.3 (Windows 8.1)
-  - Cppcheck 2.2
-- 端末
-  - コマンドプロンプト (cmd.exe)
-  - ConEmu 210422 (Windows 10)
-  - ConEmu 191012 (Windows 8.1)
-  - mintty 3.4.7 (winpty が必要) (Windows 10)
-  - mintty 3.1.4 (winpty が必要) (Windows 8.1)
-  - Windows Terminal 1.7.1033.0 (Windows 10)
-- ライセンス
-  - オリジナルと同様とします
-
-## 履歴
-- 2020-10-1  v3.9-jp0001 Windows 10 日本語対応
-- 2020-10-3  v3.9-jp0002 シンボル PDC_CLEAR_ON_RESIZE を追加
-- 2020-10-11 v3.9-jp0003 環境変数名変更  
-  ( PDCURSES_AMBIGUOUS_WIDTH → PDC_AMBIGUOUS_WIDTH  
-  PDCURSES_EMOJI_WIDTH → PDC_EMOJI_WIDTH )  
-  リソースファイル の FileDescription を変更  
-  その他、内部関数の変更等
-- 2020-10-12 v3.9-jp0004 コンパイル時の警告の解消。内部関数の処理一部変更
-- 2020-10-13 v3.9-jp0005 内部関数の処理修正  
-  (設定が全角でフォントが半角のときの対策用処理で、配列の初期化ミス)
-- 2020-10-15 v3.9-jp0006 シンボル PDC_CURSOR_HOME_ON_RESIZE を追加
-- 2020-10-19 v3.9-jp0007 シンボル PDC_ADDITIONAL_KEYS を追加
-- 2020-10-21 v3.9-jp0008 ifdef の範囲見直し等
-- 2020-10-21 v3.9-jp0009 内部処理見直し  
-  シンボル名変更 ( PDC_RESIZE_NO_CHECK → PDC_NO_CHECK_ON_RESIZE )
-- 2020-10-26 v3.9-jp0010 SetConsoleMode() の処理見直し
-- 2020-11-1  v3.9-jp0011 Windows Terminal で、マウス操作に対応  
-  マウスクリックイベントの無効化機能を追加
-- 2020-11-2  v3.9-jp0012 VT エスケープシーケンスの処理を修正
-- 2020-11-2  v3.9-jp0013 VT エスケープシーケンスの処理を一部見直し
-- 2020-11-17 v3.9-jp0014 内部処理見直し(pdckbd_sub.c, pdcdisp_sub.c)
-- 2020-11-18 v3.9-jp0015 内部処理修正(pdckbd_sub.c)
-- 2020-11-23 v3.9-jp0016 内部処理見直し(pdckbd_sub.c, pdcdisp_sub.c)
-- 2020-12-5  v3.9-jp0017 内部処理見直し(pdcdisp_sub.c, pdcscrn.c, refresh.c)  
-  (行単位のキャッシュを有効化)  
-  シンボル名変更 ( PDC_FORCE_ALL_UPDATE → PDC_UPDATE_WHOLE_LINE )  
-  Cppcheck のチェック結果の対応(addstr.c, insstr.c)
-- 2020-12-6  v3.9-jp0018 内部処理見直し(pdckbd.c, pdcscrn.c)  
-  (画面の右端に余白を設ける機能を削除した)  
-  シンボル PDC_RIGHT_MARGIN を削除
-- 2020-12-6  v3.9-jp0019 内部処理見直し(refresh.c)  
-  (Windows Terminal のリサイズで、背景色が更新されなかったため、行単位のキャッシュをやめた)  
-  シンボル名変更 ( PDC_UPDATE_WHOLE_LINE → PDC_FORCE_UPDATE )
-- 2020-12-10 v3.9-jp0020 内部処理見直し(pdcdisp_sub.c)  
-  (関数の、ポインタを取る引数をconstにした)
-- 2020-12-12 v3.9-jp0021 内部処理見直し(いくつかの配列変数をconstにした)
-- 2020-12-12 v3.9-jp0022 シンボル PDC_SKIP_ZERO_WIDTH_SPACE を追加
-- 2020-12-19 v3.9-jp0023 内部処理見直し(pdcwin.h, pdckbd_sub.c, pdckbd.c, pdcscrn.c)  
-  マウスによるコピー&ペースト処理を修正(curspriv.h, getch.c, pdcdisp_sub.c)  
-  シンボル PDC_PASTE_ON_RIGHT_CLICK を追加
-- 2020-12-20 v3.9-jp0024 内部処理見直し(pdckbd.c, pdcscrn.c)(文字列のconst化)
-- 2020-12-21 v3.9-jp0025 内部処理見直し(pdckbd_sub.c, pdcdisp_sub.c)  
-  マウスクリックイベントの無効化機能を削除(pdckbd.c, getch.c)  
-  シンボル PDC_DISABLE_CLICK_EVENT を削除
-- 2020-12-22 v3.9-jp0026 内部処理見直し(pdckbd_sub.c)
-- 2021-1-17  v3.9-jp0027 内部処理見直し(pdckbd.c)  
-  (キーボードのOEM関連キーのバリエーション対応)
-- 2021-1-24  v3.9-jp0028 内部処理見直し(pdckbd.c)  
-  (cmd.exe におけるマウスによるコピー&ペースト処理を改善(不完全))
-- 2021-2-21  v3.9-jp0029 シンボル PDC_DISABLE_CLICK_EVENT を復活  
-  (結局、マウスクリックイベントの検出が不完全であるため、復活させた)
-- 2021-2-21  v3.9-jp0030 コメント追加のみ(pdckbd.c)
-- 2021-3-13  v3.9-jp0031 Windows Terminal で、Ctrl + Z キーが入力できない件を修正(pdckbd_sub.c)  
-  (VT エスケープシーケンス の処理誤り)
-
-
-(2021-4-25)
-
-
-[1]:https://github.com/Hamayama/PDCurses-win10-jp/blob/master/wincon/pdcdisp_sub.c
-[2]:https://github.com/Hamayama/PDCurses-win10-jp/tree/master/wincon/pdckbd_sub.c
-[3]:https://github.com/Hamayama/PDCurses-win10-jp/tree/master/tools_unicode
-[4]:https://github.com/Hamayama/PDCurses-win10-jp/tree/master/demos_mingw
+PDCurses
+========
 
+[Hamayama 氏](https://github.com/Hamayama) が 「PDCurses の Windows Console 用ポート (wincon) を、  
+Windows 10 上での日本語表示が改善するように、改造した」  
+https://github.com/Hamayama/PDCurses-win10-jp  
+を PDCurses v3.9 にマージしてみたものです。実験物。
 
+makefile の修正が mingw 用のモノだけだったので、vc,watcom,bcc 用 makefile
+も更新しています。
+
+PDCurses の元々の README.md については下記に、PDCurses-win10-jp の README.md
+に関しては [win10_jp_files/README_PDCurses-win10-jp.md](win10_jp_files/README_PDCurses-win10-jp.md) に移しました。
+
+また mingw 環境用の PDCurses 直下にあった Makefile についても
+一旦削除(win10_jp_filesに移動)して、PDCurses v3.9 に近い状態に戻しています。
+
+※ 単純に混ぜただけなので、不具合が増えているかもしれません。
+　PDC_mouse_set()関数は衝突していましたが、PDCurses-win10-jp の処理のままなので…
+
+[tenk*](https://github.com/tenk-a/)
+※私がやった修正についても元のライセンスに同じです。
+
+----------------------------------------------------------------------
+
+PDCurses
+========
+
+Stable: [v3.9]  
+Current: [See git repository][git]
+
+PDCurses is a public domain curses library for [DOS], [OS/2], [Windows]
+console, [X11] and [SDL], implementing most of the functions available in
+[X/Open] and System V R4 curses, and supporting a variety of compilers for
+these platforms. The X11 and SDL ports let you recompile existing
+text-mode curses programs to produce GUI applications.
+
+PDCurses is distributed mainly as source code, but some pre-compiled
+libraries may be available.
+
+The latest version can be found at:
+
+   <https://pdcurses.org/>
+
+For changes, see the [History] file. The main documentation is now in the
+[docs] directory.
+
+
+Mailing lists
+-------------
+
+There's a low-traffic mailing list for announcements and discussion. To
+subscribe, email the [list server], with the first line of the body of
+the message containing:
+
+`subscribe pdcurses-l`
+
+or you can read the mailing list [archive].
+
+
+Other links
+-----------
+
+* [Docs][docs]
+* [GitHub Page][git]
+* [SourceForge Page]
+* [X/Open] curses
+
+
+Legal Stuff
+-----------
+
+The core package and most ports are in the public domain, but a few files
+in the [demos] and [X11][xstatus] directories are subject to copyright
+under licenses described there.
+
+This software is provided AS IS with NO WARRANTY whatsoever.
+
+
+Maintainer
+----------
+
+[William McBrine]
+
+
+[v3.9]: https://github.com/wmcbrine/PDCurses/releases/tag/3.9
+[git]: https://github.com/wmcbrine/PDCurses
+
+[History]: docs/HISTORY.md
+[docs]: docs/README.md
+
+[list server]: mailto:majordomo@lightlink.com
+[archive]: https://www.mail-archive.com/pdcurses-l@lightlink.com/
+
+[SourceForge Page]: https://sourceforge.net/projects/pdcurses
+[X/Open]: https://pubs.opengroup.org/onlinepubs/007908799/cursesix.html
+
+[DOS]: dos/README.md
+[OS/2]: os2/README.md
+[SDL]: sdl2/README.md
+[Windows]: wincon/README.md
+[X11]: x11/README.md
+
+[demos]: demos/README.md#distribution-status
+[xstatus]: x11/README.md#distribution-status
+
+[William McBrine]: https://wmcbrine.com/
