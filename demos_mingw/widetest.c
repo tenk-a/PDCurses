@@ -7,7 +7,7 @@
    Compile  : gcc -g -O2 -Wall -Wextra -o widetest.exe widetest.c
 */
 
-#include <pdcurses.h>
+#include <curses.h>
 #include <stdlib.h>
 
 int main(void)

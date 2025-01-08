@@ -7,7 +7,7 @@
    Compile  : gcc -g -O2 -Wall -Wextra -o test_input.exe test_input.c
 */
 
-#include <pdcurses.h>
+#include <curses.h>
 #include <windows.h>
 #include <stdlib.h>
 
