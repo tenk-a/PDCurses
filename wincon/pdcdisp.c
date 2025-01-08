@@ -29,10 +29,12 @@ void PDC_gotoyx(int row, int col)
 
 #ifdef PDC_WIN10_JP
     /* for windows 10 jp */
-    COORD disp_size;
-    disp_size.X = SP->cols;
-    disp_size.Y = SP->lines;
-    PDC_set_console_cursor_position(pdc_con_out, coord, disp_size, curscr->_y[row]);
+    {
+        COORD disp_size;
+        disp_size.X = SP->cols;
+        disp_size.Y = SP->lines;
+        PDC_set_console_cursor_position(pdc_con_out, coord, disp_size, curscr->_y[row]);
+    }
 #else
     SetConsoleCursorPosition(pdc_con_out, coord);
 #endif
@@ -137,8 +139,10 @@ void _set_ansi_color(short f, short b, attr_t attr)
 
 #ifdef PDC_WIN10_JP
         /* for windows 10 jp */
-        DWORD written;
-        WriteConsoleA(pdc_con_out, esc, strlen(esc), &written, NULL);
+        {
+            DWORD written;
+            WriteConsoleA(pdc_con_out, esc, strlen(esc), &written, NULL);
+        }
 #else
         if (!pdc_conemu)
             SetConsoleMode(pdc_con_out, 0x0015);
@@ -222,14 +226,16 @@ void _new_packet(attr_t attr, int lineno, int x, int len, const chtype *srcp)
         _set_ansi_color(fore, back, attr);
 #ifdef PDC_WIN10_JP
         /* for windows 10 jp */
-        COORD cur_pos;
-        COORD disp_size;
-        DWORD written;
-        cur_pos.X = x;
-        cur_pos.Y = lineno;
-        disp_size.X = SP->cols;
-        disp_size.Y = SP->lines;
-        PDC_write_console_w(pdc_con_out, buffer, len, &written, cur_pos, disp_size, curscr->_y[lineno]);
+        {
+            COORD cur_pos;
+            COORD disp_size;
+            DWORD written;
+            cur_pos.X = x;
+            cur_pos.Y = lineno;
+            disp_size.X = SP->cols;
+            disp_size.Y = SP->lines;
+            PDC_write_console_w(pdc_con_out, buffer, len, &written, cur_pos, disp_size, curscr->_y[lineno]);
+        }
 #else
 #ifdef PDC_WIDE
         WriteConsoleW(pdc_con_out, buffer, len, NULL, NULL);
@@ -287,14 +293,16 @@ NONANSI:
 
 #ifdef PDC_WIN10_JP
         /* for windows 10 jp */
-        COORD cur_pos;
-        COORD disp_size;
-        DWORD written;
-        cur_pos.X = x;
-        cur_pos.Y = lineno;
-        disp_size.X = SP->cols;
-        disp_size.Y = SP->lines;
-        PDC_write_console_w_with_attribute(pdc_con_out, buffer, len, &written, mapped_attr, cur_pos, disp_size, curscr->_y[lineno]);
+        {
+            COORD cur_pos;
+            COORD disp_size;
+            DWORD written;
+            cur_pos.X = x;
+            cur_pos.Y = lineno;
+            disp_size.X = SP->cols;
+            disp_size.Y = SP->lines;
+            PDC_write_console_w_with_attribute(pdc_con_out, buffer, len, &written, mapped_attr, cur_pos, disp_size, curscr->_y[lineno]);
+        }
 #else
         bufPos.X = bufPos.Y = 0;
         bufSize.X = len;

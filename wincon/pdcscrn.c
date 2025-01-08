@@ -511,19 +511,20 @@ int PDC_scr_open(void)
 
 #ifdef PDC_WIN10_JP
     /* for windows 10 jp */
+    {
+        /* set console mode (input) */
+        pdc_con_in_mode = 0x0088 | pdc_quick_edit;
+        SetConsoleMode(pdc_con_in, pdc_con_in_mode);
 
-    /* set console mode (input) */
-    pdc_con_in_mode = 0x0088 | pdc_quick_edit;
-    SetConsoleMode(pdc_con_in, pdc_con_in_mode);
-
-    /* set console mode (output) */
-    pdc_con_out_mode = 0;
-    if (SetConsoleMode(pdc_con_out, 0x0015)) {
-        pdc_con_out_mode = 0x0015; /* LVB + VT + PROCESSED_OUTPUT */
-    } else if (SetConsoleMode(pdc_con_out, 0x0010)) {
-        pdc_con_out_mode = 0x0010; /* LVB */
-    } else {
-        SetConsoleMode(pdc_con_out, 0);
+        /* set console mode (output) */
+        pdc_con_out_mode = 0;
+        if (SetConsoleMode(pdc_con_out, 0x0015)) {
+            pdc_con_out_mode = 0x0015; /* LVB + VT + PROCESSED_OUTPUT */
+        } else if (SetConsoleMode(pdc_con_out, 0x0010)) {
+            pdc_con_out_mode = 0x0010; /* LVB */
+        } else {
+            SetConsoleMode(pdc_con_out, 0);
+        }
     }
 #endif
 
@@ -611,10 +612,12 @@ int PDC_resize_screen(int nlines, int ncols)
 #ifdef PDC_CURSOR_HOME_ON_RESIZE
     /* workaround for windows console problem on resize
        ( https://github.com/microsoft/terminal/issues/1976 ) */
-    COORD coord;
-    coord.X = 0;
-    coord.Y = 0;
-    SetConsoleCursorPosition(pdc_con_out, coord);
+    {
+        COORD coord;
+        coord.X = 0;
+        coord.Y = 0;
+        SetConsoleCursorPosition(pdc_con_out, coord);
+    }
 #endif
 
     max = GetLargestConsoleWindowSize(pdc_con_out);
@@ -645,15 +648,17 @@ int PDC_resize_screen(int nlines, int ncols)
 
 #ifdef PDC_CLEAR_ON_RESIZE
     /* clear console */
-    WORD  attr = 0x0007;
-    WCHAR ch = 0x0020;
-    DWORD len = size.X * size.Y;
-    COORD coord2;
-    DWORD written;
-    coord2.X = 0;
-    coord2.Y = 0;
-    FillConsoleOutputAttribute(pdc_con_out, attr, len, coord2, &written);
-    FillConsoleOutputCharacterW(pdc_con_out, ch, len, coord2, &written);
+    {
+        WORD  attr = 0x0007;
+        WCHAR ch = 0x0020;
+        DWORD len = size.X * size.Y;
+        COORD coord2;
+        DWORD written;
+        coord2.X = 0;
+        coord2.Y = 0;
+        FillConsoleOutputAttribute(pdc_con_out, attr, len, coord2, &written);
+        FillConsoleOutputCharacterW(pdc_con_out, ch, len, coord2, &written);
+    }
 #endif
 
     PDC_flushinp();

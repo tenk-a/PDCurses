@@ -135,6 +135,9 @@ int wnoutrefresh(WINDOW *win)
 
 int doupdate(void)
 {
+#ifdef PDC_FORCE_UPDATE
+    int vis_bkup;
+#endif
     int y;
     bool clearall;
 
@@ -157,7 +160,7 @@ int doupdate(void)
     (void)clearall;
 
     /* disable cursor visibility */
-    int vis_bkup = SP->visibility;
+    vis_bkup = SP->visibility;
     PDC_curs_set(0);
 
     /* output all lines */
