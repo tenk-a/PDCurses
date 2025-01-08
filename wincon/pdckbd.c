@@ -375,6 +375,11 @@ static int _process_key_event(void)
 
     SP->key_code = TRUE;
 
+    /* check vk range */
+    if (vk >= MAX_KPTAB) {
+        return -1;
+    }
+
     /* Save the key modifiers. Do this first to allow to detect e.g. a
        pressed CTRL key after a hit of NUMLOCK. */
 
