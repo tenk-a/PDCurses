@@ -1,25 +1,27 @@
 PDCurses
 ========
 
-[Hamayama 氏](https://github.com/Hamayama) が 「PDCurses の Windows Console 用ポート (wincon) を、  
-Windows 10 上での日本語表示が改善するように、改造した」  
-https://github.com/Hamayama/PDCurses-win10-jp  
-を PDCurses v3.9 にマージしてみたものです。実験物。
+[Hamayama 氏](https://github.com/Hamayama) が https://github.com/Hamayama/PDCurses-win10-jp  にて  
+ 「PDCurses の Windows Console 用ポート (wincon) を、Windows 10 上での日本語表示が改善するように、改造」  
+したモノを PDCurses v3.9 にマージしてみたものです。実験物。
 
-makefile の修正が mingw 用のモノだけだったので、vc,watcom,bcc 用 makefile
-も更新しています。
+Windowsの UTF-8 (CP65001) コンソールは Windows8 までは １エンコード文字が１表示文字になっていましたが、Windows10 からはいわゆる半角/全角文字の幅が反映されて互換がなくなったので、以前の挙動に寄せ、NCURSESでは入力できないキー等にも対応したモノのようです。
 
-PDCurses の元々の README.md については下記に、PDCurses-win10-jp の README.md
-に関しては [win10_jp_files/README_PDCurses-win10-jp.md](win10_jp_files/README_PDCurses-win10-jp.md) に移しました。
+[PDCurses_win10_jp](https://github.com/tenk-a/PDCurses/tree/PDCurses_win10_jp)ブランチがマージ元で、[win10_jp](https://github.com/tenk-a/PDCurses/tree/win10_jp) ブランチが3.9へマージしてみたモノです。
 
-また mingw 環境用の PDCurses 直下にあった Makefile についても
-一旦削除(win10_jp_filesに移動)して、PDCurses v3.9 に近い状態に戻しています。
+makefile の修正が mingw 用のモノだけだったので、vc,watcom,bcc 用 makefile  も更新しています。
 
-※ 単純に混ぜただけなので、不具合が増えているかもしれません。
-　PDC_mouse_set()関数は衝突していましたが、PDCurses-win10-jp の処理のままなので…
+PDCurses の元々の README.md については下記に、  
+PDCurses-win10-jp の README.md  は [win10_jp_files/README_PDCurses-win10-jp.md](win10_jp_files/README_PDCurses-win10-jp.md)  
+に移しました。
+
+単純に混ぜただけなので、不具合が増えているかもしれません。  
+PDC_mouse_set()関数は衝突していましたが、PDCurses-win10-jp の処理のままなので…
 
 [tenk*](https://github.com/tenk-a/)
 ※私がやった修正についても元のライセンスに同じです。
+
+※ macやlinux の ncurses の挙動の兼ね合い等、これを反映するかどうかはケースバイケース。win10環境前提で作ったモノは逆におかしくなるが必然…
 
 ----------------------------------------------------------------------
 
